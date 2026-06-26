@@ -1,0 +1,77 @@
+[
+  {
+    "id": 1368,
+    "name": "Sleeper",
+    "level": 67,
+    "hp": 8237,
+    "element": "Earth 2",
+    "race": "Formless",
+    "size": "Medium",
+    "isBoss": false,
+    "hasMvpDrops": false,
+    "spawns": [
+      { "map": "yuno_fild06", "count": 70 },
+      { "map": "yuno_fild02", "count": 30 }
+    ],
+    "drops": [
+      { "itemId": 997, "itemKey": "Great_Nature", "name": "Great Nature", "chance": 2500, "baseSellPrice": 1500 },
+      { "itemId": 984, "itemKey": "Oridecon", "name": "Oridecon", "chance": 80, "baseSellPrice": 550 }
+    ]
+  },
+  {
+    "id": 1382,
+    "name": "Goat",
+    "level": 69,
+    "hp": 11077,
+    "element": "Fire 3",
+    "race": "Brute",
+    "size": "Medium",
+    "isBoss": false,
+    "hasMvpDrops": false,
+    "spawns": [
+      { "map": "yuno_fild06", "count": 50 },
+      { "map": "yuno_fild11", "count": 40 }
+    ],
+    "drops": [
+      { "itemId": 7139, "itemKey": "Antelope_Horn", "name": "Antelope Horn", "chance": 3000, "baseSellPrice": 336 },
+      { "itemId": 7136, "itemKey": "Antelope_Skin", "name": "Antelope Skin", "chance": 5500, "baseSellPrice": 384 }
+    ]
+  },
+  {
+    "id": 1020,
+    "name": "Mandragora",
+    "level": 12,
+    "hp": 405,
+    "element": "Earth 3",
+    "race": "Plant",
+    "size": "Medium",
+    "isBoss": false,
+    "hasMvpDrops": false,
+    "spawns": [
+      { "map": "prt_fild02", "count": 100 },
+      { "map": "prt_fild06", "count": 60 }
+    ],
+    "drops": [
+      { "itemId": 990, "itemKey": "Yellow_Live", "name": "Green Live", "chance": 500, "baseSellPrice": 500 },
+      { "itemId": 703, "itemKey": "Hinalle", "name": "Hinalle", "chance": 200, "baseSellPrice": 800 }
+    ]
+  },
+  {
+    "id": 1086,
+    "name": "Golden Thief Bug",
+    "level": 64,
+    "hp": 126000,
+    "element": "Fire 2",
+    "race": "Insect",
+    "size": "Large",
+    "isBoss": true,
+    "hasMvpDrops": true,
+    "spawns": [
+      { "map": "prt_sewb4", "count": 1 }
+    ],
+    "drops": [
+      { "itemId": 603, "itemKey": "Old_Blue_Box", "name": "Old Blue Box", "chance": 3000, "baseSellPrice": 5000, "type": "mvp" },
+      { "itemId": 969, "itemKey": "Gold", "name": "Gold", "chance": 1000, "baseSellPrice": 100000 }
+    ]
+  }
+]
