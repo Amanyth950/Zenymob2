@@ -1,0 +1,6 @@
+{
+  "name": "Zenymob2 sample data",
+  "generatedAt": "2026-06-26T00:00:00Z",
+  "dropChanceScale": 10000,
+  "notes": "Sample data for frontend development. Replace with generated Hercules/UARO data before production release."
+}
