@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { filterValues, sortValues } from './search';
+import type { ReactNode } from 'react';
 import { exportManualPrices, importManualPrices, loadManualPrices, saveManualPrices } from './storage';
 import { valueMonster } from './pricing';
 import type { DropValue, ManualPrices, Monster, MonsterValue, Settings } from './types';
@@ -15,22 +15,25 @@ const DEFAULT_SETTINGS: Settings = {
   showMvp: false,
 };
 
+type DataStatus = 'loading' | 'ready' | 'error';
+type SortKey = 'expectedValue' | 'mapScore' | 'spawns' | 'level';
+
 function zeny(value: number): string {
   return `${Math.round(value).toLocaleString()}z`;
 }
 
 function compactZeny(value: number): string {
   const rounded = Math.round(value);
-  if (Math.abs(rounded) >= 1_000_000) return `${(rounded / 1_000_000).toFixed(rounded >= 10_000_000 ? 1 : 2).replace(/\.0+$/, '')}Mz`;
-  if (Math.abs(rounded) >= 1_000) return `${(rounded / 1_000).toFixed(rounded >= 100_000 ? 0 : 1).replace(/\.0$/, '')}Kz`;
-  return `${rounded.toLocaleString()}z`;
+  if (Math.abs(rounded) >= 1_000_000) return `${(rounded / 1_000_000).toFixed(rounded >= 10_000_000 ? 1 : 2).replace(/\.0+$/, '')}M`;
+  if (Math.abs(rounded) >= 1_000) return `${(rounded / 1_000).toFixed(rounded >= 100_000 ? 0 : 1).replace(/\.0$/, '')}K`;
+  return rounded.toLocaleString();
 }
 
 function percentFromChance(chance: number): string {
   return `${(chance / 100).toFixed(2).replace(/\.00$/, '')}%`;
 }
 
-function numberValue(value: string, fallback = 0): number {
+function parseNumber(value: string, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
@@ -40,11 +43,43 @@ function bestSpawnCount(monster: Monster): number {
 }
 
 function bestSpawnMap(monster: Monster): string {
-  return monster.spawns[0]?.map ?? 'No spawn data';
+  return monster.spawns[0]?.map ?? '-';
+}
+
+function elementFamily(element: string): string {
+  return element.split(' ')[0]?.trim() || 'Unknown';
 }
 
 function plural(value: number, singular: string, pluralValue = `${singular}s`): string {
   return `${value.toLocaleString()} ${value === 1 ? singular : pluralValue}`;
+}
+
+function matchesQuery(value: MonsterValue, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  const searchable = [
+    value.monster.name,
+    String(value.monster.id),
+    value.monster.element,
+    value.monster.race,
+    value.monster.size,
+    ...value.monster.spawns.map((spawn) => spawn.map),
+    ...value.drops.map((drop) => drop.name),
+    ...value.drops.map((drop) => String(drop.itemId ?? '')),
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  return searchable.includes(q);
+}
+
+function sortValues(values: MonsterValue[], sortBy: SortKey): MonsterValue[] {
+  const sorted = [...values];
+  if (sortBy === 'mapScore') return sorted.sort((a, b) => b.mapScore - a.mapScore);
+  if (sortBy === 'spawns') return sorted.sort((a, b) => bestSpawnCount(b.monster) - bestSpawnCount(a.monster));
+  if (sortBy === 'level') return sorted.sort((a, b) => a.monster.level - b.monster.level);
+  return sorted.sort((a, b) => b.expectedValue - a.expectedValue);
 }
 
 export default function App() {
@@ -52,13 +87,18 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [manualPrices, setManualPrices] = useState<ManualPrices>(() => loadManualPrices());
   const [query, setQuery] = useState('');
-  const [sortBy, setSortBy] = useState('expectedValue');
+  const [sortBy, setSortBy] = useState<SortKey>('expectedValue');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [killsPer30, setKillsPer30] = useState(0);
   const [importText, setImportText] = useState('');
-  const [dataStatus, setDataStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [dataStatus, setDataStatus] = useState<DataStatus>('loading');
   const [priceMessage, setPriceMessage] = useState('');
-  const [copyLabel, setCopyLabel] = useState('Copy export JSON');
+  const [copyLabel, setCopyLabel] = useState('Copy export');
+  const [raceFilter, setRaceFilter] = useState('all');
+  const [sizeFilter, setSizeFilter] = useState('all');
+  const [elementFilter, setElementFilter] = useState('all');
+  const [minEv, setMinEv] = useState('');
+  const [minSpawn, setMinSpawn] = useState('');
 
   useEffect(() => {
     setDataStatus('loading');
@@ -86,23 +126,53 @@ export default function App() {
     [monsters, settings, manualPrices],
   );
 
-  const filtered = useMemo(
-    () => sortValues(filterValues(values, query, settings), sortBy),
-    [values, query, settings, sortBy],
-  );
+  const raceOptions = useMemo(() => [...new Set(monsters.map((monster) => monster.race).filter(Boolean))].sort(), [monsters]);
+  const sizeOptions = useMemo(() => [...new Set(monsters.map((monster) => monster.size).filter(Boolean))].sort(), [monsters]);
+  const elementOptions = useMemo(() => [...new Set(monsters.map((monster) => elementFamily(monster.element)).filter(Boolean))].sort(), [monsters]);
+
+  const filtered = useMemo(() => {
+    const minEvValue = minEv.trim() === '' ? 0 : parseNumber(minEv);
+    const minSpawnValue = minSpawn.trim() === '' ? 0 : parseNumber(minSpawn);
+
+    return sortValues(
+      values.filter((value) => {
+        const monster = value.monster;
+        if (!settings.showBoss && monster.isBoss) return false;
+        if (!settings.showMvp && monster.hasMvpDrops) return false;
+        if (raceFilter !== 'all' && monster.race !== raceFilter) return false;
+        if (sizeFilter !== 'all' && monster.size !== sizeFilter) return false;
+        if (elementFilter !== 'all' && elementFamily(monster.element) !== elementFilter) return false;
+        if (value.expectedValue < minEvValue) return false;
+        if (bestSpawnCount(monster) < minSpawnValue) return false;
+        return matchesQuery(value, query);
+      }),
+      sortBy,
+    );
+  }, [values, query, settings.showBoss, settings.showMvp, raceFilter, sizeFilter, elementFilter, minEv, minSpawn, sortBy]);
 
   const selected = useMemo(
     () => filtered.find((value) => value.monster.id === selectedId) ?? filtered[0] ?? null,
     [filtered, selectedId],
   );
 
-  const shownValues = filtered.slice(0, 100);
+  const visibleResults = filtered.slice(0, 100);
   const manualPriceCount = Object.keys(manualPrices).length;
-  const bossCount = monsters.filter((monster) => monster.isBoss).length;
   const hourlyEstimate = selected ? selected.expectedValue * killsPer30 * 2 : 0;
+  const activeFilterCount = [query, minEv, minSpawn].filter((value) => value.trim() !== '').length
+    + [raceFilter, sizeFilter, elementFilter].filter((value) => value !== 'all').length
+    + [settings.showBoss, settings.showMvp, settings.poringCoin].filter(Boolean).length;
 
   function updateSetting<K extends keyof Settings>(key: K, value: Settings[K]) {
     setSettings((previous) => ({ ...previous, [key]: value }));
+  }
+
+  function clearFilters() {
+    setQuery('');
+    setRaceFilter('all');
+    setSizeFilter('all');
+    setElementFilter('all');
+    setMinEv('');
+    setMinSpawn('');
   }
 
   function setManualPrice(key: string, rawValue: string) {
@@ -124,7 +194,7 @@ export default function App() {
       const imported = importManualPrices(importText);
       setManualPrices(imported);
       setImportText('');
-      setPriceMessage(`Imported ${plural(Object.keys(imported).length, 'price override')}.`);
+      setPriceMessage(`Imported ${plural(Object.keys(imported).length, 'override')}.`);
     } catch {
       setPriceMessage('Import failed. Paste valid Zenymob2 price JSON and try again.');
     }
@@ -135,250 +205,204 @@ export default function App() {
     try {
       await navigator.clipboard.writeText(exported);
       setCopyLabel('Copied');
-      setPriceMessage(`Exported ${plural(manualPriceCount, 'price override')}.`);
-      window.setTimeout(() => setCopyLabel('Copy export JSON'), 1600);
+      setPriceMessage(`Copied ${plural(manualPriceCount, 'override')} to clipboard.`);
+      window.setTimeout(() => setCopyLabel('Copy export'), 1500);
     } catch {
       setImportText(exported);
       setPriceMessage('Clipboard access was blocked, so the export JSON was placed in the import box.');
     }
   }
 
-  function resetSettings() {
-    setSettings(DEFAULT_SETTINGS);
-    setKillsPer30(0);
-  }
-
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="Zenymob2 home">
-          <span className="brand-mark">Z2</span>
-          <span>
-            <strong>Zenymob2</strong>
-            <small>Farming value planner</small>
-          </span>
-        </a>
-        <nav className="topnav" aria-label="Product navigation">
-          <a href="#planner">Planner</a>
-          <a href="#prices">Prices</a>
-          <a href="#drops">Drops</a>
-        </nav>
+      <header className="app-header">
+        <div>
+          <p className="eyebrow">Zenymob2</p>
+          <h1>Farming mob finder</h1>
+        </div>
+        <div className="header-stats" aria-label="Dataset summary">
+          <span>{dataStatus === 'loading' ? 'Loading data' : dataStatus === 'error' ? 'Data error' : plural(monsters.length, 'mob')}</span>
+          <span>{manualPriceCount.toLocaleString()} overrides</span>
+        </div>
       </header>
 
-      <section className="hero" id="top">
-        <div className="hero-copy">
-          <p className="eyebrow">Pre-renewal Ragnarok farming intelligence</p>
-          <h1>Find the mobs worth your time.</h1>
-          <p>
-            Compare expected zeny per kill, map density, server-specific item prices, and manual market overrides in one static, browser-native planner.
-          </p>
-          <div className="hero-actions">
-            <a className="primary-action" href="#planner">Start planning</a>
-            <a className="secondary-action" href="#prices">Manage prices</a>
-          </div>
+      <section className="panel filters-panel" aria-label="Search and filters">
+        <div className="primary-controls">
+          <label className="search-control">
+            <span>Search</span>
+            <input placeholder="Monster, map, item, ID..." value={query} onChange={(event) => setQuery(event.target.value)} />
+          </label>
+          <label>
+            <span>Sort</span>
+            <select value={sortBy} onChange={(event) => setSortBy(event.target.value as SortKey)}>
+              <option value="expectedValue">EV / kill</option>
+              <option value="mapScore">Map score</option>
+              <option value="spawns">Best-map spawns</option>
+              <option value="level">Level</option>
+            </select>
+          </label>
         </div>
-        <div className="hero-card" aria-label="Dataset summary">
-          <span className="hero-card__label">Dataset</span>
-          <strong>{dataStatus === 'loading' ? 'Loading' : monsters.length.toLocaleString()}</strong>
-          <span>{dataStatus === 'ready' ? 'monsters indexed' : dataStatus === 'error' ? 'dataset unavailable' : 'loading monsters'}</span>
-          <div className="hero-card__grid">
-            <div><strong>{bossCount.toLocaleString()}</strong><span>Boss flagged</span></div>
-            <div><strong>{manualPriceCount.toLocaleString()}</strong><span>Overrides</span></div>
-          </div>
+
+        <div className="quick-filters">
+          <label>
+            <span>Race</span>
+            <select value={raceFilter} onChange={(event) => setRaceFilter(event.target.value)}>
+              <option value="all">All races</option>
+              {raceOptions.map((race) => <option key={race} value={race}>{race}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Element</span>
+            <select value={elementFilter} onChange={(event) => setElementFilter(event.target.value)}>
+              <option value="all">All elements</option>
+              {elementOptions.map((element) => <option key={element} value={element}>{element}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Size</span>
+            <select value={sizeFilter} onChange={(event) => setSizeFilter(event.target.value)}>
+              <option value="all">All sizes</option>
+              {sizeOptions.map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Min EV</span>
+            <input inputMode="numeric" placeholder="0" value={minEv} onChange={(event) => setMinEv(event.target.value)} />
+          </label>
+          <label>
+            <span>Min spawns</span>
+            <input inputMode="numeric" placeholder="0" value={minSpawn} onChange={(event) => setMinSpawn(event.target.value)} />
+          </label>
         </div>
+
+        <div className="switch-strip" aria-label="Common toggles">
+          <Toggle checked={settings.uaro} label="UARO" onChange={(checked) => updateSetting('uaro', checked)} />
+          <Toggle checked={settings.overcharge} label="Overcharge" onChange={(checked) => updateSetting('overcharge', checked)} />
+          <Toggle checked={settings.poringCoin} label="Poring Coin" onChange={(checked) => updateSetting('poringCoin', checked)} />
+          <Toggle checked={settings.showBoss} label="Bosses" onChange={(checked) => updateSetting('showBoss', checked)} />
+          <Toggle checked={settings.showMvp} label="MVP" onChange={(checked) => updateSetting('showMvp', checked)} />
+          <button type="button" className="text-button" onClick={clearFilters} disabled={activeFilterCount === 0}>Clear filters</button>
+        </div>
+
+        <details className="advanced-controls">
+          <summary>Advanced assumptions</summary>
+          <div className="advanced-grid">
+            <label>
+              <span>Drop multiplier</span>
+              <input type="number" min="0" step="0.5" value={settings.dropMultiplier} onChange={(event) => updateSetting('dropMultiplier', parseNumber(event.target.value) as Settings['dropMultiplier'])} />
+            </label>
+            <label>
+              <span>Overcharge rate</span>
+              <input type="number" min="1" step="0.01" value={settings.overchargeRate} onChange={(event) => updateSetting('overchargeRate', parseNumber(event.target.value, 1) as Settings['overchargeRate'])} />
+            </label>
+            <label>
+              <span>Poring Coin price</span>
+              <input type="number" min="0" step="500" value={settings.poringCoinPrice} onChange={(event) => updateSetting('poringCoinPrice', parseNumber(event.target.value) as Settings['poringCoinPrice'])} />
+            </label>
+            <button type="button" className="secondary-button" onClick={() => { setSettings(DEFAULT_SETTINGS); setKillsPer30(0); }}>Reset assumptions</button>
+          </div>
+        </details>
       </section>
 
-      <main className="dashboard" id="planner">
-        <aside className="control-rail" aria-label="Planner assumptions">
-          <section className="panel control-panel">
-            <div className="panel-heading">
-              <span className="section-kicker">Controls</span>
-              <h2>Assumptions</h2>
-              <p>Tune server rules and personal pricing before comparing monsters.</p>
-            </div>
-
-            <div className="control-group">
-              <label>
-                <span>Drop multiplier</span>
-                <input type="number" min="0" step="0.5" value={settings.dropMultiplier} onChange={(event) => updateSetting('dropMultiplier', numberValue(event.target.value) as Settings['dropMultiplier'])} />
-              </label>
-              <label>
-                <span>Overcharge rate</span>
-                <input type="number" min="1" step="0.01" value={settings.overchargeRate} onChange={(event) => updateSetting('overchargeRate', numberValue(event.target.value, 1) as Settings['overchargeRate'])} />
-              </label>
-              <label>
-                <span>Poring Coin price</span>
-                <input type="number" min="0" step="500" value={settings.poringCoinPrice} onChange={(event) => updateSetting('poringCoinPrice', numberValue(event.target.value) as Settings['poringCoinPrice'])} />
-              </label>
-            </div>
-
-            <div className="toggle-list">
-              <label className="toggle-row">
-                <input type="checkbox" checked={settings.overcharge} onChange={(event) => updateSetting('overcharge', event.target.checked)} />
-                <span><strong>Merchant Overcharge</strong><small>Apply sell-price multiplier where allowed.</small></span>
-              </label>
-              <label className="toggle-row">
-                <input type="checkbox" checked={settings.uaro} onChange={(event) => updateSetting('uaro', event.target.checked)} />
-                <span><strong>UARO prices</strong><small>Use known server prices and conversions.</small></span>
-              </label>
-              <label className="toggle-row">
-                <input type="checkbox" checked={settings.poringCoin} onChange={(event) => updateSetting('poringCoin', event.target.checked)} />
-                <span><strong>Include Poring Coin</strong><small>Add optional custom EV to every monster.</small></span>
-              </label>
-              <label className="toggle-row">
-                <input type="checkbox" checked={settings.showBoss} onChange={(event) => updateSetting('showBoss', event.target.checked)} />
-                <span><strong>Show boss-flagged mobs</strong><small>Include monsters marked with the boss flag.</small></span>
-              </label>
-              <label className="toggle-row">
-                <input type="checkbox" checked={settings.showMvp} onChange={(event) => updateSetting('showMvp', event.target.checked)} />
-                <span><strong>Show MVP monsters and drops</strong><small>Include MVP entries and MVP-only loot.</small></span>
-              </label>
-            </div>
-
-            <button className="ghost-button" type="button" onClick={resetSettings}>Reset defaults</button>
-          </section>
-        </aside>
-
-        <section className="workbench">
-          <section className="panel search-panel">
+      <main className="workspace">
+        <section className="panel results-panel" aria-label="Monster results">
+          <div className="panel-bar">
             <div>
-              <span className="section-kicker">Monster search</span>
-              <h2>Compare farming targets</h2>
+              <strong>{plural(filtered.length, 'mob')}</strong>
+              <span>{visibleResults.length < filtered.length ? `Showing top ${visibleResults.length}` : 'All results shown'}</span>
             </div>
-            <div className="toolbar">
-              <label className="search-field">
-                <span>Search monsters, maps, items, IDs</span>
-                <input placeholder="Try Sleeper, yuno_fild06, Great Nature..." value={query} onChange={(event) => setQuery(event.target.value)} />
-              </label>
-              <label>
-                <span>Sort by</span>
-                <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-                  <option value="expectedValue">Expected value</option>
-                  <option value="mapScore">Map score</option>
-                  <option value="spawns">Best-map spawns</option>
-                  <option value="level">Level</option>
-                </select>
-              </label>
-            </div>
-            <div className="result-summary">
-              <span>{plural(filtered.length, 'match', 'matches')}</span>
-              <span>{shownValues.length < filtered.length ? `Showing top ${shownValues.length}` : 'All matching results shown'}</span>
-            </div>
-          </section>
+            <span>{activeFilterCount} active filters</span>
+          </div>
 
           {dataStatus === 'loading' ? (
-            <section className="panel empty-state">
-              <span className="loader" aria-hidden="true" />
-              <h2>Loading monster data</h2>
-              <p>The planner is preparing the dataset and pricing model.</p>
-            </section>
+            <EmptyState title="Loading monster data" body="Preparing the mob list." />
           ) : dataStatus === 'error' ? (
-            <section className="panel empty-state empty-state--danger">
-              <h2>Dataset unavailable</h2>
-              <p>Could not load <code>/data/monsters.json</code>. Generate the dataset and rebuild before release.</p>
-            </section>
-          ) : shownValues.length === 0 ? (
-            <section className="panel empty-state">
-              <h2>No matching monsters</h2>
-              <p>Clear the search or enable boss/MVP filters to expand the result set.</p>
-              <button className="ghost-button" type="button" onClick={() => setQuery('')}>Clear search</button>
-            </section>
+            <EmptyState title="Dataset unavailable" body="Could not load /data/monsters.json. Generate data before release." tone="danger" />
+          ) : visibleResults.length === 0 ? (
+            <EmptyState title="No mobs match" body="Loosen the search or filters to broaden the list." action={<button type="button" className="secondary-button" onClick={clearFilters}>Clear filters</button>} />
           ) : (
-            <section className="results-grid" aria-label="Monster results">
-              {shownValues.map((value, index) => (
-                <MonsterResultCard
+            <div className="mob-table">
+              <div className="mob-row mob-row--head" aria-hidden="true">
+                <span>Mob</span>
+                <span>EV / kill</span>
+                <span>Map score</span>
+                <span>Best map</span>
+                <span>Top drops</span>
+              </div>
+              {visibleResults.map((value) => (
+                <MobRow
                   key={value.monster.id}
                   value={value}
-                  rank={index + 1}
-                  active={selected?.monster.id === value.monster.id}
+                  selected={selected?.monster.id === value.monster.id}
                   onSelect={() => setSelectedId(value.monster.id)}
                 />
               ))}
-            </section>
+            </div>
           )}
         </section>
 
-        <aside className="inspector" id="drops">
-          <section className="panel detail-panel">
-            {selected ? (
-              <MonsterDetail
-                value={selected}
-                killsPer30={killsPer30}
-                setKillsPer30={setKillsPer30}
-                hourlyEstimate={hourlyEstimate}
-                manualPrices={manualPrices}
-                setManualPrice={setManualPrice}
-              />
-            ) : (
-              <div className="empty-state empty-state--compact">
-                <h2>Select a monster</h2>
-                <p>Choose a result to inspect drops, spawns, and zeny/hour.</p>
-              </div>
-            )}
-          </section>
+        <aside className="panel detail-panel" aria-label="Selected monster details">
+          {selected ? (
+            <MonsterDetail
+              value={selected}
+              killsPer30={killsPer30}
+              setKillsPer30={setKillsPer30}
+              hourlyEstimate={hourlyEstimate}
+              manualPrices={manualPrices}
+              setManualPrice={setManualPrice}
+            />
+          ) : (
+            <EmptyState title="Select a mob" body="Click a result to inspect drops, maps, and hourly EV." />
+          )}
+
+          <details className="price-box">
+            <summary>Manual prices</summary>
+            <p>Overrides are stored in this browser and replace NPC/UARO/conversion values.</p>
+            <textarea value={importText} onChange={(event) => setImportText(event.target.value)} placeholder="Paste manual price JSON here" />
+            <div className="price-actions">
+              <button type="button" className="primary-button" onClick={handleImport}>Import</button>
+              <button type="button" className="secondary-button" onClick={handleCopyExport}>{copyLabel}</button>
+              <button type="button" className="danger-button" onClick={() => { setManualPrices({}); setPriceMessage('Manual prices cleared.'); }}>Clear</button>
+            </div>
+            {priceMessage ? <p className="status-message">{priceMessage}</p> : null}
+          </details>
         </aside>
       </main>
-
-      <section className="panel prices-panel" id="prices">
-        <div className="panel-heading prices-heading">
-          <div>
-            <span className="section-kicker">Market controls</span>
-            <h2>Manual prices</h2>
-            <p>Override NPC, UARO, and conversion prices. Overrides are stored locally in this browser.</p>
-          </div>
-          <span className="price-count">{plural(manualPriceCount, 'override')}</span>
-        </div>
-        <div className="price-tools">
-          <label>
-            <span>Import or stage export JSON</span>
-            <textarea value={importText} onChange={(event) => setImportText(event.target.value)} placeholder="Paste manual price JSON here" />
-          </label>
-          <div className="price-actions">
-            <button type="button" className="primary-button" onClick={handleImport}>Import prices</button>
-            <button type="button" className="secondary-button" onClick={handleCopyExport}>{copyLabel}</button>
-            <button type="button" className="danger-button" onClick={() => { setManualPrices({}); setPriceMessage('Manual prices cleared.'); }}>Clear overrides</button>
-          </div>
-          {priceMessage ? <p className="status-message">{priceMessage}</p> : null}
-        </div>
-      </section>
     </div>
   );
 }
 
-function MonsterResultCard({ value, rank, active, onSelect }: {
+function Toggle({ checked, label, onChange }: {
+  checked: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className={checked ? 'toggle is-on' : 'toggle'}>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function MobRow({ value, selected, onSelect }: {
   value: MonsterValue;
-  rank: number;
-  active: boolean;
+  selected: boolean;
   onSelect: () => void;
 }) {
   const { monster } = value;
-  const topDrops = value.topDrops.slice(0, 3);
+  const topDrops = value.topDrops.slice(0, 2).map((drop) => drop.name).join(', ');
 
   return (
-    <button className={active ? 'monster-card monster-card--active' : 'monster-card'} type="button" onClick={onSelect} aria-pressed={active}>
-      <div className="monster-card__topline">
-        <span className="rank">#{rank}</span>
-        <span className={monster.isBoss ? 'badge badge--warning' : 'badge'}>{monster.isBoss ? 'Boss' : 'Regular'}</span>
-      </div>
-      <div className="monster-card__identity">
+    <button type="button" className={selected ? 'mob-row is-selected' : 'mob-row'} onClick={onSelect} aria-pressed={selected}>
+      <span className="mob-cell">
         <strong>{monster.name}</strong>
-        <span>ID {monster.id} / Lv {monster.level} / {monster.element}</span>
-      </div>
-      <div className="monster-card__metrics">
-        <div><span>EV / kill</span><strong>{compactZeny(value.expectedValue)}</strong></div>
-        <div><span>Map score</span><strong>{compactZeny(value.mapScore)}</strong></div>
-        <div><span>Best map</span><strong>{bestSpawnMap(monster)}</strong></div>
-      </div>
-      <div className="chip-row">
-        <span>{monster.race}</span>
-        <span>{monster.size}</span>
-        <span>{plural(bestSpawnCount(monster), 'spawn')}</span>
-      </div>
-      {topDrops.length > 0 ? (
-        <div className="top-drops">
-          {topDrops.map((drop) => <span key={`${drop.itemKey}-${drop.type ?? 'normal'}`}>{drop.name}</span>)}
-        </div>
-      ) : <span className="muted">No valued drops</span>}
+        <small>ID {monster.id} / Lv {monster.level} / {monster.race} / {monster.element}</small>
+      </span>
+      <span className="metric-cell">{compactZeny(value.expectedValue)}z</span>
+      <span className="metric-cell">{compactZeny(value.mapScore)}z</span>
+      <span>{bestSpawnMap(monster)} <small>({bestSpawnCount(monster)})</small></span>
+      <span className="drop-preview">{topDrops || 'No valued drops'}</span>
     </button>
   );
 }
@@ -394,12 +418,15 @@ function MonsterDetail({ value, killsPer30, setKillsPer30, hourlyEstimate, manua
   const { monster } = value;
 
   return (
-    <>
-      <div className="detail-header">
-        <span className="section-kicker">Selected target</span>
-        <h2>{monster.name}</h2>
-        <p>ID {monster.id} / Lv {monster.level} / {monster.race} / {monster.size} / {monster.element}</p>
-      </div>
+    <div className="detail-stack">
+      <header className="detail-header">
+        <div>
+          <p className="eyebrow">Selected mob</p>
+          <h2>{monster.name}</h2>
+          <span>ID {monster.id} / Lv {monster.level} / {monster.race} / {monster.size} / {monster.element}</span>
+        </div>
+        {monster.isBoss ? <span className="badge">Boss</span> : null}
+      </header>
 
       <div className="metric-grid">
         <div><span>EV / kill</span><strong>{zeny(value.expectedValue)}</strong></div>
@@ -407,30 +434,31 @@ function MonsterDetail({ value, killsPer30, setKillsPer30, hourlyEstimate, manua
         <div><span>Best map</span><strong>{bestSpawnMap(monster)}</strong></div>
       </div>
 
-      <label className="kills-input">
-        <span>Kills per 30 minutes</span>
-        <input type="number" min="0" step="25" value={killsPer30} onChange={(event) => setKillsPer30(numberValue(event.target.value))} />
-      </label>
-      <div className="hourly-card">
-        <span>Estimated zeny/hour</span>
-        <strong>{zeny(hourlyEstimate)}</strong>
-        <small>Based on current EV and kill pace.</small>
+      <div className="hourly-box">
+        <label>
+          <span>Kills / 30 min</span>
+          <input type="number" min="0" step="25" value={killsPer30} onChange={(event) => setKillsPer30(parseNumber(event.target.value))} />
+        </label>
+        <div>
+          <span>Zeny / hour</span>
+          <strong>{zeny(hourlyEstimate)}</strong>
+        </div>
       </div>
 
-      <section className="detail-section">
-        <div className="section-title-row">
+      <section>
+        <div className="section-row">
           <h3>Drops</h3>
           <span>{plural(value.drops.length, 'drop')}</span>
         </div>
-        <div className="drop-list">
+        <div className="drops-table">
           {value.drops.map((drop) => (
             <DropRow key={`${drop.itemKey}-${drop.type ?? 'normal'}-${drop.chance}`} drop={drop} manualPrices={manualPrices} setManualPrice={setManualPrice} />
           ))}
         </div>
       </section>
 
-      <section className="detail-section">
-        <div className="section-title-row">
+      <section>
+        <div className="section-row">
           <h3>Spawns</h3>
           <span>{plural(monster.spawns.length, 'map')}</span>
         </div>
@@ -445,7 +473,7 @@ function MonsterDetail({ value, killsPer30, setKillsPer30, hourlyEstimate, manua
           </div>
         ) : <p className="muted">No permanent spawn data available.</p>}
       </section>
-    </>
+    </div>
   );
 }
 
@@ -455,19 +483,28 @@ function DropRow({ drop, manualPrices, setManualPrice }: {
   setManualPrice: (key: string, value: string) => void;
 }) {
   return (
-    <article className="drop-card">
-      <div className="drop-card__main">
+    <div className="drop-row">
+      <span>
         <strong>{drop.name}</strong>
-        <span>{percentFromChance(drop.adjustedChance)} chance / {drop.price.source}</span>
-      </div>
-      <div className="drop-card__value">
-        <strong>{zeny(drop.expectedValue)}</strong>
-        <span>{zeny(drop.price.activePrice)} each</span>
-      </div>
-      <label className="manual-price-field">
-        <span>Manual price</span>
-        <input placeholder="Override" value={manualPrices[drop.itemKey] ?? ''} onChange={(event) => setManualPrice(drop.itemKey, event.target.value)} />
-      </label>
-    </article>
+        <small>{percentFromChance(drop.adjustedChance)} / {drop.price.source}</small>
+      </span>
+      <span>{zeny(drop.expectedValue)}</span>
+      <input aria-label={`Manual price for ${drop.name}`} placeholder="Manual" value={manualPrices[drop.itemKey] ?? ''} onChange={(event) => setManualPrice(drop.itemKey, event.target.value)} />
+    </div>
+  );
+}
+
+function EmptyState({ title, body, tone, action }: {
+  title: string;
+  body: string;
+  tone?: 'danger';
+  action?: ReactNode;
+}) {
+  return (
+    <div className={tone === 'danger' ? 'empty-state empty-state--danger' : 'empty-state'}>
+      <h2>{title}</h2>
+      <p>{body}</p>
+      {action}
+    </div>
   );
 }
