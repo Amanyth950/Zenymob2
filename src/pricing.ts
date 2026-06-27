@@ -80,7 +80,8 @@ export function poringCoinDrop(price: number): MonsterDrop {
 }
 
 export function valueDrops(monster: Monster, settings: Settings, manualPrices: ManualPrices): DropValue[] {
-  const drops = settings.poringCoin ? [...monster.drops, poringCoinDrop(settings.poringCoinPrice)] : monster.drops;
+  const regularDrops = settings.showMvp ? monster.drops : monster.drops.filter((drop) => drop.type !== 'mvp');
+  const drops = settings.poringCoin ? [...regularDrops, poringCoinDrop(settings.poringCoinPrice)] : regularDrops;
   const values = drops.map((drop) => {
     const chance = adjustedChance(drop, settings);
     const price = resolvePrice(drop, settings, manualPrices);
