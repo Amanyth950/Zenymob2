@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "generate:data": "node scripts/generate-data.mjs",
+    "build": "npm run generate:data && tsc -b && vite build",
     "preview": "vite preview",
     "deploy": "wrangler deploy"
   },
