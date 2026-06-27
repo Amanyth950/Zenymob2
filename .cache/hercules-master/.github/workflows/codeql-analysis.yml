@@ -1,0 +1,44 @@
+name: "CodeQL"
+
+on: workflow_call
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['c', 'python']
+
+    # github.head_ref will stop previous runs in the same PR (if in a PR)
+    # github.run_id is a fallback when outside a PR (e.g. every merge in master will run, and previous won't stop)
+    concurrency:
+      group: codeql-${{ github.head_ref || github.run_id }}_${{ matrix.language }}
+      cancel-in-progress: true
+
+    permissions:
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        # We must fetch at least the immediate parents so that if this is
+        # a pull request then we can checkout the head.
+        fetch-depth: 2
+
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: ${{ matrix.language }}
+
+    # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
+    # If this step fails, then you should remove it and run the build manually (see below)
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v4
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v4

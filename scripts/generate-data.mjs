@@ -546,6 +546,7 @@ function frontendMonster(monster, items, spawns) {
   const mvpDrops = monster.mvpDrops.map((drop) => itemDrop(drop, items.byAegis.get(drop.aegisName), 'mvp'));
   return {
     id: monster.id,
+    spriteName: monster.spriteName,
     name: monster.name,
     level: monster.level,
     hp: monster.hp,

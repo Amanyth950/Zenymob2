@@ -1,6 +1,9 @@
 {
-  "name": "Zenymob2 sample data",
-  "generatedAt": "2026-06-26T00:00:00Z",
+  "name": "Zenymob2 generated Hercules data",
+  "generatedAt": "2026-06-27T03:18:43.863Z",
+  "herculesRef": "master",
   "dropChanceScale": 10000,
-  "notes": "Sample data for frontend development. Replace with generated Hercules/UARO data before production release."
+  "monsterCount": 1007,
+  "itemCount": 7311,
+  "notes": "Generated during build from Hercules pre-renewal database files."
 }

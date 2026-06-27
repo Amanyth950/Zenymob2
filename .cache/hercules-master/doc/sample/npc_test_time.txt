@@ -1,0 +1,25 @@
+//===== Hercules Script =======================================
+//= Sample: Time Test
+//===== By: ==================================================
+//= rAthena Dev Team
+//===== Current Version: =====================================
+//= 20151115
+//===== Description: =========================================
+//= Demonstrates time commands.
+//============================================================
+
+prontera,157,181,6	script	Time Sample	8W_SOLDIER,{
+	mes("[Time Sample]");
+	mesf("       System Tick : %d", gettimetick(GETTIMETICK_SYSTEM_MS));
+	mesf("         Time Tick : %d", gettimetick(GETTIMETICK_HOUROFDAY_S));
+	mesf("    GETTIME_SECOND : %d (Sec)", gettime(GETTIME_SECOND));
+	mesf("    GETTIME_MINUTE : %d (Min)", gettime(GETTIME_MINUTE));
+	mesf("      GETTIME_HOUR : %d (Hour)", gettime(GETTIME_HOUR));
+	mesf("   GETTIME_WEEKDAY : %d (WeekDay)", gettime(GETTIME_WEEKDAY));
+	mesf("GETTIME_DAYOFMONTH : %d (MonthDay)", gettime(GETTIME_DAYOFMONTH));
+	mesf("     GETTIME_MONTH : %d (Month)", gettime(GETTIME_MONTH));
+	mesf("      GETTIME_YEAR : %d (Year)", gettime(GETTIME_YEAR));
+	mesf(" GETTIME_DAYOFYEAR : %d (Day of Year)", gettime(GETTIME_DAYOFYEAR));
+	mesf("        gettimestr : %s", gettimestr("%Y-%m/%d %H:%M:%S",19));
+	close();
+}

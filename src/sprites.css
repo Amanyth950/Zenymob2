@@ -1,0 +1,79 @@
+.mob-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mob-text {
+  min-width: 0;
+}
+
+.monster-sprite {
+  display: grid;
+  flex: 0 0 40px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.monster-sprite img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.monster-sprite--fallback {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.app-footer {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding: 14px 2px 0;
+}
+
+.app-footer p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.app-footer a {
+  color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .mob-cell { align-items: flex-start; }
+}
+
+
+.sprite-attribution-footer {
+  max-width: 1240px;
+  margin: 20px auto 28px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.sprite-attribution-footer strong {
+  color: var(--text);
+}
+
+.sprite-attribution-footer a {
+  color: var(--accent);
+  font-weight: 800;
+}

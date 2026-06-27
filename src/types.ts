@@ -17,6 +17,7 @@ export type MonsterSpawn = {
 
 export type Monster = {
   id: number;
+  spriteName?: string;
   name: string;
   level: number;
   hp: number;

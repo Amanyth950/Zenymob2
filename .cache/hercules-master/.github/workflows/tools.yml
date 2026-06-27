@@ -1,0 +1,45 @@
+name: tools
+
+on: workflow_call
+
+env:
+  MYSQL_DATABASE: 'ragnarok'
+  MYSQL_USER: 'ragnarok'
+  MYSQL_PASSWORD: 'ragnarok'
+  MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+  DEBIAN_COMMON_PACKAGES: python3 python3-pip
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # github.head_ref will stop previous runs in the same PR (if in a PR)
+    # github.run_id is a fallback when outside a PR (e.g. every merge in master will run, and previous won't stop)
+    concurrency:
+      group: tools-${{ github.head_ref || github.run_id }}
+      cancel-in-progress: true
+
+    container:
+      image: debian:unstable
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: info
+        run: |
+          uname -a
+
+      - name: install packages
+        run: |
+          ./tools/ci/retry.sh apt-get update
+          ./tools/ci/retry.sh apt-get install -y -qq $INSTALL_PACKAGES $DEBIAN_COMMON_PACKAGES
+          pip3 install --upgrade pip sqlfluff --break-system-packages
+
+      - name: check sql syntax
+        run: |
+          ./tools/ci/retry.sh python3 tools/validate_sql-files.py
+
+      - name: check sql updates
+        run: |
+          python3 ./tools/checksql.py

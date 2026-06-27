@@ -88,6 +88,26 @@ function sortValues(values: MonsterValue[], sortBy: SortKey, ascending: boolean)
   return sorted.sort((a, b) => (a.expectedValue - b.expectedValue) * dir);
 }
 
+function spriteFileName(monster: Monster): string | null {
+  const spriteName = monster.spriteName?.trim();
+  return spriteName ? encodeURIComponent(spriteName) : null;
+}
+
+function MonsterSprite({ monster }: { monster: Monster }) {
+  const [failed, setFailed] = useState(false);
+  const fileName = spriteFileName(monster);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [monster.id, monster.spriteName]);
+
+  if (!fileName || failed) {
+    return <span className="monster-sprite monster-sprite--fallback" aria-hidden="true">?</span>;
+  }
+
+  return <span className="monster-sprite" aria-hidden="true"><img src={`/sprites/monsters/${fileName}.gif`} alt="" loading="lazy" onError={() => setFailed(true)} /></span>;
+}
+
 export default function App() {
   const [monsters, setMonsters] = useState<Monster[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -317,7 +337,7 @@ function MonsterResults({ dataStatus, values, selectedId, clearFilters, onSelect
 
 function MobRow({ value, selected, onSelect }: { value: MonsterValue; selected: boolean; onSelect: () => void }) {
   const topDrops = value.topDrops.slice(0, 2).map((drop) => `${drop.name} ${drop.share.toFixed(0)}%`).join(', ');
-  return <button type="button" className={selected ? 'mob-row is-selected' : 'mob-row'} onClick={onSelect}><span className="mob-cell"><strong>{value.monster.name}</strong><small>ID {value.monster.id} / Lv {value.monster.level} / HP {value.monster.hp.toLocaleString()} / {value.monster.race} / {value.monster.element}</small></span><span className="metric-cell">{compactZeny(value.expectedValue)}z</span><span className="metric-cell">{compactZeny(value.mapScore)}z</span><span>{bestSpawnMap(value.monster)} <small>({bestSpawnCount(value.monster)})</small></span><span className="drop-preview">{topDrops || 'No valued drops'}</span></button>;
+  return <button type="button" className={selected ? 'mob-row is-selected' : 'mob-row'} onClick={onSelect}><span className="mob-cell"><MonsterSprite monster={value.monster} /><span className="mob-text"><strong>{value.monster.name}</strong><small>ID {value.monster.id} / Lv {value.monster.level} / HP {value.monster.hp.toLocaleString()} / {value.monster.race} / {value.monster.element}</small></span></span><span className="metric-cell">{compactZeny(value.expectedValue)}z</span><span className="metric-cell">{compactZeny(value.mapScore)}z</span><span>{bestSpawnMap(value.monster)} <small>({bestSpawnCount(value.monster)})</small></span><span className="drop-preview">{topDrops || 'No valued drops'}</span></button>;
 }
 
 function MonsterDetail({ value, killsPer30, setKillsPer30, hourlyEstimate, manualPrices, setManualPrice }: { value: MonsterValue; killsPer30: number; setKillsPer30: (value: number) => void; hourlyEstimate: number; manualPrices: ManualPrices; setManualPrice: (key: string, value: string) => void }) {
@@ -350,4 +370,8 @@ function RawView({ values }: { values: MonsterValue[] }) {
 
 function EmptyState({ title, body, tone, action }: { title: string; body: string; tone?: 'danger'; action?: ReactNode }) {
   return <div className={tone === 'danger' ? 'empty-state empty-state--danger' : 'empty-state'}><h2>{title}</h2><p>{body}</p>{action}</div>;
+}
+
+function AttributionFooter() {
+  return <footer className="app-footer"><p>Ragnarok Online graphics and materials are copyright © Gravity Co., Ltd. &amp; Lee Myoungjin. Some Ragnarok-related graphics are copyright © GungHo Online Entertainment, Inc. Sprite references are sourced from <a href="https://nn.ai4rei.net/dev/npclist/" target="_blank" rel="noreferrer">nn.ai4rei.net</a>. Zenymob2 is not affiliated with or endorsed by Gravity, GungHo, or Ai4rei.</p></footer>;
 }
