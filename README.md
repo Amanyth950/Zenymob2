@@ -47,6 +47,16 @@ Root directory: /
 Node version: Cloudflare default is fine for now
 ```
 
+## Data conversion
+
+A temporary converter is included so the old Streamlit-era CSV can feed this frontend before the generator is rewritten directly:
+
+```bash
+python scripts/convert_monster_ev_csv.py monster_ev.csv public/data/monsters.json
+```
+
+The converter expects `monster_ev.csv` to contain `drops_json` and `spawn_summary` columns.
+
 ## Data contract
 
 The frontend expects monsters from:
@@ -91,9 +101,10 @@ Drop chance uses the same Hercules scale as before:
 ## Migration plan
 
 1. Keep the old Python parser/generator as the data source.
-2. Add a new generator output for `public/data/monsters.json`.
-3. Replace the sample JSON file with generated production data.
-4. Polish UI and split components once the data contract is stable.
+2. Use the temporary CSV converter to test the frontend with real data.
+3. Add a direct JSON output mode to the old generator.
+4. Replace the sample JSON file with generated production data.
+5. Polish UI and split components once the data contract is stable.
 
 ## Notes
 
