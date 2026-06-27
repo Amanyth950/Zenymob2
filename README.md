@@ -1,14 +1,16 @@
 # Zenymob2
 
-Zenymob2 is the static frontend successor to the Streamlit Mob Value Planner. The goal is to keep Python for offline data generation and move the user-facing app to a fast browser UI.
+Zenymob2 is the static frontend successor to the Streamlit Mob Value Planner. The goal is to keep the data-generation idea from the old Python project and move the user-facing app to a fast browser UI.
 
 ## Current state
 
-This repository currently contains a Vite + React + TypeScript prototype with sample data.
+This repository contains a Vite + React + TypeScript app. During `npm run build`, it downloads the Hercules repository archive, parses the pre-renewal monster/item/spawn data, and writes a generated frontend dataset to `public/data/monsters.json` before Vite builds the static app.
 
 Implemented:
 
 - client-side monster search and sorting
+- full generated Hercules pre-renewal monster dataset at build time
+- spawn parsing from Hercules NPC mob files
 - UARO price switch
 - Merchant Overcharge switch
 - Great Nature conversion at `7.5 * Green Live`
@@ -16,16 +18,18 @@ Implemented:
 - manual price overrides stored in `localStorage`
 - manual price import/export JSON
 - selected-monster drop breakdown
+- MVP drops excluded from EV unless the MVP toggle is enabled
 - kills-per-30-min zeny/hour estimate
-
-The sample dataset lives in `public/data/monsters.json`. Replace it with generated data before production use.
 
 ## Local development
 
 ```bash
 npm install
+npm run generate:data
 npm run dev
 ```
+
+`npm run dev` uses the current `public/data/monsters.json` file. Run `npm run generate:data` first when you want to refresh the generated dataset locally.
 
 ## Production build
 
@@ -33,23 +37,49 @@ npm run dev
 npm run build
 ```
 
-The static build output is written to `dist/`.
+The build command runs:
 
-## Cloudflare Pages setup
-
-Use these settings:
-
-```text
-Framework preset: Vite
-Build command: npm run build
-Build output directory: dist
-Root directory: /
-Node version: Cloudflare default is fine for now
+```bash
+npm run generate:data && tsc -b && vite build
 ```
 
-## Data conversion
+The static build output is written to `dist/`.
 
-A temporary converter is included so the old Streamlit-era CSV can feed this frontend before the generator is rewritten directly:
+## Cloudflare Workers & Pages setup
+
+Use these settings in the Workers static assets flow:
+
+```text
+Build command: npm run build
+Deploy command: npm run deploy
+Build output directory: dist
+Root directory: /
+```
+
+`wrangler.jsonc` points Wrangler at `./dist` and enables single-page app fallback.
+
+## Data generation
+
+The main generator is:
+
+```bash
+node scripts/generate-data.mjs
+```
+
+By default it uses the Hercules `master` branch. To pin another branch or SHA-compatible archive ref:
+
+```bash
+HERCULES_REF=master npm run generate:data
+```
+
+Generated files:
+
+```text
+public/data/monsters.json
+public/data/metadata.json
+```
+
+A temporary CSV converter is also included for old Streamlit-era CSV files:
 
 ```bash
 python scripts/convert_monster_ev_csv.py monster_ev.csv public/data/monsters.json
@@ -86,7 +116,8 @@ Each monster should look like:
       "name": "Great Nature",
       "chance": 2500,
       "baseSellPrice": 1500,
-      "ignoreOvercharge": false
+      "ignoreOvercharge": false,
+      "type": "normal"
     }
   ]
 }
@@ -97,14 +128,6 @@ Drop chance uses the same Hercules scale as before:
 ```text
 10000 = 100%
 ```
-
-## Migration plan
-
-1. Keep the old Python parser/generator as the data source.
-2. Use the temporary CSV converter to test the frontend with real data.
-3. Add a direct JSON output mode to the old generator.
-4. Replace the sample JSON file with generated production data.
-5. Polish UI and split components once the data contract is stable.
 
 ## Notes
 
