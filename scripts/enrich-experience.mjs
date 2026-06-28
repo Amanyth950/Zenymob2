@@ -35,7 +35,7 @@ function parseExperienceMap(text) {
   let jobExp = null;
 
   function commit() {
-    if (id === null) return;
+    if (id === null || (baseExp === null && jobExp === null)) return;
     const previous = map.get(id) || {};
     map.set(id, {
       baseExp: baseExp ?? previous.baseExp ?? 0,
@@ -87,7 +87,13 @@ async function loadExperienceMap() {
   const combined = new Map();
   for (const file of mobDbFiles) {
     const parsed = parseExperienceMap(await fs.readFile(file, 'utf8'));
-    for (const [id, exp] of parsed) combined.set(id, exp);
+    for (const [id, exp] of parsed) {
+      const previous = combined.get(id) || {};
+      combined.set(id, {
+        baseExp: exp.baseExp ?? previous.baseExp ?? 0,
+        jobExp: exp.jobExp ?? previous.jobExp ?? 0,
+      });
+    }
   }
 
   if (!combined.size) {
