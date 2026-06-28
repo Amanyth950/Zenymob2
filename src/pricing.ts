@@ -40,6 +40,11 @@ function manualPrice(drop: MonsterDrop, manualPrices: ManualPrices): number | un
   return manualPrices[drop.itemKey] ?? manualPrices[drop.name];
 }
 
+function safeNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
 export function resolvePrice(drop: MonsterDrop, settings: Settings, manualPrices: ManualPrices): PriceResolution {
   const manual = manualPrice(drop, manualPrices);
   if (manual !== undefined && Number.isFinite(manual) && manual >= 0) {
@@ -104,11 +109,24 @@ export function valueMonster(monster: Monster, settings: Settings, manualPrices:
   const drops = valueDrops(monster, settings, manualPrices);
   const expectedValue = drops.reduce((sum, drop) => sum + drop.expectedValue, 0);
   const bestSpawn = monster.spawns.reduce((best, spawn) => Math.max(best, spawn.count), 0);
+  const hp = Math.max(safeNumber(monster.hp), 1);
+  const baseExp = safeNumber(monster.baseExp);
+  const jobExp = safeNumber(monster.jobExp);
+  const totalExp = baseExp + jobExp;
   return {
     monster,
     drops,
     expectedValue,
     mapScore: expectedValue * bestSpawn,
     topDrops: drops.slice(0, 3),
+    baseExp,
+    jobExp,
+    totalExp,
+    baseExpPerHp: baseExp / hp,
+    jobExpPerHp: jobExp / hp,
+    totalExpPerHp: totalExp / hp,
+    baseExpMapScore: baseExp * bestSpawn,
+    jobExpMapScore: jobExp * bestSpawn,
+    totalExpMapScore: totalExp * bestSpawn,
   };
 }

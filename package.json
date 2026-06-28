@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "generate:data": "node scripts/generate-data.mjs && node scripts/enrich-sprite-names.mjs",
+    "generate:data": "node scripts/generate-data.mjs && node scripts/enrich-experience.mjs && node scripts/enrich-sprite-names.mjs",
     "sync:sprites": "node scripts/sync-monster-sprites.mjs",
     "build": "npm run generate:data && tsc -b && vite build",
     "preview": "vite preview",
     "deploy": "wrangler deploy",
+    "enrich:experience": "node scripts/enrich-experience.mjs",
     "enrich:sprite-names": "node scripts/enrich-sprite-names.mjs"
   },
   "dependencies": {
