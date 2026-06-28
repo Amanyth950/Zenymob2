@@ -313,7 +313,7 @@ function summarizeMaps(values: MonsterValue[], scoreFor: (value: MonsterValue) =
   const grouped = new Map<string, { value: MonsterValue; count: number; score: number }[]>();
   for (const value of values) {
     for (const spawn of value.monster.spawns) {
-      grouped.set(spawn.map, [...(grouped.get(spawn.map) ?? []), { map: spawn.map, value, count: spawn.count, score: scoreFor(value) * spawn.count }]);
+      grouped.set(spawn.map, [...(grouped.get(spawn.map) ?? []), { value, count: spawn.count, score: scoreFor(value) * spawn.count }]);
     }
   }
 
