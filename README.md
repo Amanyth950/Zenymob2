@@ -8,21 +8,42 @@ This repository contains a Vite + React + TypeScript app. During `npm run build`
 
 Implemented:
 
+- top-level Zeny and Experience farming modes
+- mode-specific filters, assumptions, maps, and raw exports
 - client-side monster search and sorting
 - full generated Hercules pre-renewal monster dataset at build time
 - spawn parsing from Hercules NPC mob files
 - base EXP and job EXP enrichment from Hercules monster database files
-- experience farming tab with base/job/total EXP, EXP per HP, spawn-weighted EXP, target-kill estimates, and EXP/hour estimates
-- UARO price switch
-- Merchant Overcharge switch
-- Great Nature conversion at `7.5 * Green Live`
-- optional Poring Coin EV support
+- Experience mode with base/job/total EXP, EXP per HP, spawn-weighted EXP, target-kill estimates, and EXP/hour estimates
+- UARO x5 EXP rate and weekend x7.5 EXP rate support for Experience mode
+- independent boss/MVP monster scope switches for Zeny and Experience modes
+- Zeny mode with UARO price switch, Merchant Overcharge, Great Nature conversion at `7.5 * Green Live`, optional Poring Coin EV, and manual prices
 - manual price overrides stored in `localStorage`
 - manual price import/export JSON
 - selected-monster drop breakdown
-- MVP drops excluded from EV unless the MVP toggle is enabled
 - kills-per-30-min zeny/hour and experience/hour estimates
-- filtered raw-data CSV/JSON exports including EXP columns
+
+## Product model
+
+Zenymob2 treats farming as two faces of the same monster dataset:
+
+```text
+Farm goal
+├─ Zeny
+│  ├─ Best farms
+│  ├─ Maps
+│  ├─ Items
+│  └─ Raw data
+└─ Experience
+   ├─ Best EXP
+   ├─ Maps
+   └─ Raw data
+```
+
+The two modes intentionally share monster facts like level, HP, race, element, size, spawns, boss status, and MVP status. They do not share economic or rate assumptions:
+
+- Zeny assumptions cover item prices, UARO prices, Overcharge, Poring Coin EV, drop multiplier, boss scope, and MVP scope.
+- Experience assumptions cover EXP rate, weekend 7.5x EXP, boss scope, and MVP scope.
 
 ## Local development
 
@@ -144,7 +165,7 @@ Drop chance uses the same Hercules scale as before:
 
 ## Experience workflow
 
-The experience tab is meant for leveling decisions rather than loot decisions. It compares:
+The Experience mode is meant for leveling decisions rather than loot decisions. It compares:
 
 - base EXP per kill
 - job EXP per kill
