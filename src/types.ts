@@ -21,6 +21,8 @@ export type Monster = {
   name: string;
   level: number;
   hp: number;
+  baseExp: number;
+  jobExp: number;
   element: string;
   race: string;
   size: string;
@@ -71,4 +73,13 @@ export type MonsterValue = {
   mapScore: number;
   topDrops: DropValue[];
   drops: DropValue[];
+  baseExp: number;
+  jobExp: number;
+  totalExp: number;
+  baseExpPerHp: number;
+  jobExpPerHp: number;
+  totalExpPerHp: number;
+  baseExpMapScore: number;
+  jobExpMapScore: number;
+  totalExpMapScore: number;
 };
